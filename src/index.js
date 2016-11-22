@@ -1,5 +1,5 @@
 import compiler from './compiler/compiler';
-import {extendDeep} from './util';
+import {extendDeep,Event} from './util';
 let _instance = null;
 class MVVM {
     constructor(config) {
@@ -12,6 +12,7 @@ class MVVM {
         }, config);
         this.data = extendDeep(this.options.data);
         this._data = {};
+        this.observer = new Event();
         this.init();
     }
     init() {

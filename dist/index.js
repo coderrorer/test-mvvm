@@ -84,6 +84,7 @@
 	        }, config);
 	        this.data = (0, _util.extendDeep)(this.options.data);
 	        this._data = {};
+	        this.observer = new _util.Event();
 	        this.init();
 	    }
 	
@@ -127,6 +128,7 @@
 	
 	function compiler(mvvm, node) {
 	    var util = Util.getInstance();
+	    util.mvvm = mvvm;
 	    util.doms = util.parseHTML(node);
 	    util.walk(util.doms, mvvm);
 	    return util.doms;
@@ -139,6 +141,8 @@
 	
 	        this.doms = null;
 	    }
+	    //通过此方法深度优先遍历HTML模版
+	
 	
 	    _createClass(Util, [{
 	        key: 'walk',
@@ -149,7 +153,7 @@
 	            if (childNodes && childNodes.length) {
 	                childNodes.forEach(function (child) {
 	                    if (child.nodeName == '#text') {
-	                        //text
+	                        //节点类型为text时,处理双重花括号的变量绑定
 	                        if (child.textContent) {
 	                            if (child.textContent.indexOf('{{') != -1 && child.textContent.indexOf('}}') != -1) {
 	                                var bindName = child.textContent.substring(child.textContent.indexOf('{{') + 2, child.textContent.indexOf('}}'));
@@ -157,30 +161,31 @@
 	                                child.textContent = "";
 	                            }
 	                        }
-	                    } else {}
+	                    }
 	                    if (child.attributes && child.attributes.length) {
-	                        console.log(child.attributes.length);
-	
 	                        var _loop = function _loop(i) {
 	                            var attribute = child.attributes[i];
 	                            if (attribute.nodeName.indexOf('@') == 0) {
+	                                //如果属性以@开头,则给该DOM绑定监听事件
 	                                var eventName = new String(attribute.nodeName);
 	                                eventName = eventName.substr(1);
-	                                child.addEventListener(eventName, mvvm.options.methods[attribute.nodeValue].bind(mvvm));
+	                                _this.addListener(child, eventName, mvvm.options.methods[attribute.nodeValue]);
 	                            } else if (attribute.nodeName.indexOf(':') == 0) {
+	                                //如果属性以:开头,则将该属性的值绑定为对应的变量值
 	                                var propName = new String(attribute.nodeName);
 	                                propName = propName.substr(1);
 	                                (0, _index.propertyVM)(attribute.nodeValue, child, mvvm, propName);
 	                            } else if (attribute.nodeName == 'm-model') {
-	                                //double-side binding
+	                                //two-way binding  不仅将INPUT的值绑定为对应变量值,还要给INPUT添加ONINPUT事件
 	                                (0, _index.modelVM)(attribute.nodeValue, child, mvvm);
-	                                child.addEventListener('input', function (e) {
+	                                _this.addListener(child, 'input', function (e) {
 	                                    mvvm.data[attribute.nodeValue] = e.target.value;
 	                                });
 	                            }
 	                            //todo add if/else for-loop
 	                        };
 	
+	                        //遍历节点的属性
 	                        for (var i = 0; i < child.attributes.length; i++) {
 	                            _loop(i);
 	                        }
@@ -190,6 +195,11 @@
 	                    }
 	                });
 	            }
+	        }
+	    }, {
+	        key: 'addListener',
+	        value: function addListener(node, eventName, fn) {
+	            node.addEventListener(eventName, fn.bind(this.mvvm));
 	        }
 	    }, {
 	        key: 'parseHTML',
@@ -329,13 +339,17 @@
 /* 4 */
 /***/ function(module, exports) {
 
-	"use strict";
+	'use strict';
 	
 	Object.defineProperty(exports, "__esModule", {
 	    value: true
 	});
 	
 	exports.default = function (bindName, node, mvvm) {
+	    mvvm.observer.on(bindName + '_Changed', function (v) {
+	        mvvm._data[bindName] = v;
+	        node.textContent = v;
+	    });
 	    Object.defineProperty(mvvm.data, bindName, {
 	        get: function get() {
 	            return mvvm._data[bindName];
@@ -343,8 +357,7 @@
 	        set: function set(v) {
 	            console.log(bindName, v);
 	            if (v === mvvm._data[bindName]) return;
-	            mvvm._data[bindName] = v;
-	            node.textContent = v;
+	            mvvm.observer.trigger(bindName + '_Changed', v);
 	        }
 	    });
 	};
@@ -353,22 +366,25 @@
 /* 5 */
 /***/ function(module, exports) {
 
-	"use strict";
+	'use strict';
 	
 	Object.defineProperty(exports, "__esModule", {
 	    value: true
 	});
 	
 	exports.default = function (bindName, node, mvvm, propertyName) {
+	    mvvm.observer.on(bindName + '_Changed', function (v) {
+	        mvvm._data[bindName] = v;
+	        node.setAttribute(propertyName, v);
+	    });
 	    Object.defineProperty(mvvm.data, bindName, {
 	        get: function get() {
 	            return mvvm._data[bindName];
 	        },
 	        set: function set(v) {
-	            console.log(propertyName, v, node);
+	            console.log(bindName, v);
 	            if (v === mvvm._data[bindName]) return;
-	            mvvm._data[bindName] = v;
-	            node.setAttribute(propertyName, v);
+	            mvvm.observer.trigger(bindName + '_Changed', v);
 	        }
 	    });
 	};
@@ -377,13 +393,17 @@
 /* 6 */
 /***/ function(module, exports) {
 
-	"use strict";
+	'use strict';
 	
 	Object.defineProperty(exports, "__esModule", {
 	    value: true
 	});
 	
 	exports.default = function (bindName, node, mvvm) {
+	    mvvm.observer.on(bindName + '_Changed', function (v) {
+	        mvvm._data[bindName] = v;
+	        node.value = v;
+	    });
 	    Object.defineProperty(mvvm.data, bindName, {
 	        get: function get() {
 	            return mvvm._data[bindName];
@@ -391,8 +411,7 @@
 	        set: function set(v) {
 	            console.log(bindName, v);
 	            if (v === mvvm._data[bindName]) return;
-	            mvvm._data[bindName] = v;
-	            node.value = v;
+	            mvvm.observer.trigger(bindName + '_Changed', v);
 	        }
 	    });
 	};
@@ -407,9 +426,14 @@
 	    value: true
 	});
 	
+	var _createClass = function () { function defineProperties(target, props) { for (var i = 0; i < props.length; i++) { var descriptor = props[i]; descriptor.enumerable = descriptor.enumerable || false; descriptor.configurable = true; if ("value" in descriptor) descriptor.writable = true; Object.defineProperty(target, descriptor.key, descriptor); } } return function (Constructor, protoProps, staticProps) { if (protoProps) defineProperties(Constructor.prototype, protoProps); if (staticProps) defineProperties(Constructor, staticProps); return Constructor; }; }();
+	
 	var _typeof = typeof Symbol === "function" && typeof Symbol.iterator === "symbol" ? function (obj) { return typeof obj; } : function (obj) { return obj && typeof Symbol === "function" && obj.constructor === Symbol && obj !== Symbol.prototype ? "symbol" : typeof obj; };
 	
 	exports.extendDeep = extendDeep;
+	
+	function _classCallCheck(instance, Constructor) { if (!(instance instanceof Constructor)) { throw new TypeError("Cannot call a class as a function"); } }
+	
 	function extendDeep(parent, child) {
 	    child = child || {};
 	    for (var i in parent) {
@@ -429,6 +453,47 @@
 	    }
 	    return child;
 	}
+	
+	var Event = exports.Event = function () {
+	    function Event() {
+	        _classCallCheck(this, Event);
+	    }
+	
+	    _createClass(Event, [{
+	        key: "on",
+	        value: function on(name, lister) {
+	            if (!name) {
+	                return;
+	            }
+	            if (!this._events_) {
+	                this._events_ = {};
+	            }
+	            var events = this._events_;
+	            if (!events[name]) {
+	                events[name] = [];
+	            }
+	            events[name].push(lister);
+	        }
+	    }, {
+	        key: "trigger",
+	        value: function trigger(name) {
+	            var events = this._events_;
+	            if (!name || !events || !events[name]) {
+	                return;
+	            }
+	            var queue = events[name];
+	            var length = queue.length;
+	            var args = Array.prototype.slice.call(arguments, 1);
+	            for (var i = 0; i < length; i++) {
+	                queue[i].apply(this, args);
+	            }
+	        }
+	    }]);
+	
+	    return Event;
+	}();
+	
+	;
 
 /***/ }
 /******/ ]);

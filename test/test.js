@@ -2,14 +2,12 @@ import MVVM from '../src/index';
 new MVVM({
     template: `
         <div>
-            <p>name :</p> 
+            <p>name :</p> <span>{{name}}</span>
             <input type="text" m-model="name" />
-            {{phoneNum}}
-            <div class="address">
-                address:<br />
-                <input type="text" m-model="address" />
-            </div>
-            <button @click="handleClick" :style="color">click</button>
+            <p>phoneNum:</p>
+            {{phoneNum}} <button @click="handleClick" :style="color">changePhone</button>
+            <p>address:</p><span>{{address}}</span>
+            <input type="text" m-model="address" /> 
         </div>
     `,
     data:{

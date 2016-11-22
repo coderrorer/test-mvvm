@@ -6,6 +6,7 @@ import {doubleQuoteVM,propertyVM,modelVM} from '../directive/index';
 
 export default function compiler(mvvm, node) {
     let util = Util.getInstance();
+    util.mvvm = mvvm;
     util.doms = util.parseHTML(node);
     util.walk(util.doms, mvvm);
     return util.doms;
@@ -15,39 +16,41 @@ class Util {
     constructor() {
         this.doms = null;
     }
-
+    //通过此方法深度优先遍历HTML模版
     walk(node, mvvm) {
         let childNodes = node.childNodes;
         if (childNodes && childNodes.length) {
             childNodes.forEach((child)=> {
                 if (child.nodeName == '#text') {
-                    //text
+                    //节点类型为text时,处理双重花括号的变量绑定
                     if (child.textContent) {
-                        if (child.textContent.indexOf('{{') != -1 && child.textContent.indexOf('}}') != -1) {
-                            let bindName = child.textContent.substring(child.textContent.indexOf('{{') + 2, child.textContent.indexOf('}}'));
+                        if (child.textContent.indexOf('{{') != -1 &&
+                            child.textContent.indexOf('}}') != -1) {
+                            let bindName = child.textContent.substring(child.textContent.indexOf('{{') + 2
+                                , child.textContent.indexOf('}}'));
                             doubleQuoteVM(bindName, child, mvvm);
                             child.textContent = "";
                         }
                     }
-                } else {
-
                 }
                 if (child.attributes && child.attributes.length) {
-                    console.log(child.attributes.length);
+                    //遍历节点的属性
                     for (let i = 0; i < child.attributes.length; i++) {
                         let attribute = child.attributes[i];
                         if (attribute.nodeName.indexOf('@') == 0) {
+                            //如果属性以@开头,则给该DOM绑定监听事件
                             let eventName = new String(attribute.nodeName);
                             eventName = eventName.substr(1);
-                            child.addEventListener(eventName, mvvm.options.methods[attribute.nodeValue].bind(mvvm));
+                            this.addListener(child,eventName,mvvm.options.methods[attribute.nodeValue]);
                         }else if(attribute.nodeName.indexOf(':') == 0) {
+                            //如果属性以:开头,则将该属性的值绑定为对应的变量值
                             let propName = new String(attribute.nodeName);
                             propName = propName.substr(1);
                             propertyVM(attribute.nodeValue,child,mvvm,propName);
                         }else if(attribute.nodeName == 'm-model') {
-                            //double-side binding
+                            //two-way binding  不仅将INPUT的值绑定为对应变量值,还要给INPUT添加ONINPUT事件
                             modelVM(attribute.nodeValue,child,mvvm);
-                            child.addEventListener('input', (e)=>{
+                            this.addListener(child,'input',(e)=>{
                                 mvvm.data[attribute.nodeValue] = e.target.value;
                             });
                         }
@@ -59,6 +62,10 @@ class Util {
                 }
             })
         }
+    }
+
+    addListener(node,eventName,fn) {
+        node.addEventListener(eventName,fn.bind(this.mvvm));
     }
 
     parseHTML(str) {
