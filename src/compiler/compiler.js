@@ -1,10 +1,13 @@
-import $ from 'jquery';
+/**
+ * template render function
+ * */
+
 import {doubleQuoteVM,propertyVM,modelVM} from '../directive/index';
-import {extendDeep} from '../util';
+
 export default function compiler(mvvm, node) {
     let util = Util.getInstance();
     util.doms = util.parseHTML(node);
-    util.walk($(util.doms)[0], mvvm);
+    util.walk(util.doms, mvvm);
     return util.doms;
 }
 let _util = null;
