@@ -21,7 +21,7 @@ new MVVM({
     },
     methods:{
         handleClick(e){
-            this.data.phoneNum = '18817555897';
+            this.data.phoneNum = '12345678';
         }
     }
 
